@@ -1,6 +1,7 @@
 """Scenario checks for answer checks over retrieved content."""
 
 from agent.guardrails import (
+    abstention_policy,
     check_grounding,
     redact,
     scan_for_injected_instructions,
@@ -34,3 +35,20 @@ def test_numeric_answer_needs_retrieved_support_and_cited_anchor():
     assert verify_arithmetic(answer["text"], ["Working deck: 45 frames."]).ok
     assert not verify_arithmetic(answer["text"], ["Canonical deck: 31 frames."]).ok
     assert verify_arithmetic(answer["text"]).checked is False
+
+
+def test_abstention_policy_keeps_complete_clean_answers_and_rejects_gaps():
+    anchor = "Frame:3f2a9c11/w/041"
+    answer = {
+        "text": "The course day is 26.",
+        "course_day": "day26",
+        "track": "Track-3",
+        "cited_anchors": [anchor],
+    }
+    grounded = check_grounding(answer, [anchor])
+    assert not abstention_policy(grounded, answer=answer, required_fields=("course_day", "track"))
+    assert abstention_policy(grounded, answer={"track": "Track-3"}, required_fields=("course_day", "track"))
+    assert abstention_policy(grounded, unresolved_conflict=True)
+    assert abstention_policy(grounded, unsafe_to_answer=True)
+    unsupported = verify_arithmetic("There are 46 frames.", ["There are 45 frames."])
+    assert abstention_policy(grounded, arithmetic=unsupported)

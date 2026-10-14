@@ -33,11 +33,11 @@
 
 ### Dũng — agent
 
-- [ ] Rà luồng thật của `Gateway.decide`: route theo header/replica, lease còn hiệu lực, scope/learner/audience, write có `If-Match` và `Idempotency-Key`, field mask và ngân sách dùng chung 10 vòng. Chỉ nối `agent/strategy.py` khi có dữ liệu đầu vào đáng tin và test tái hiện được; tránh deny toàn bộ hoặc chọn replica theo hằng số.
-- [ ] Rà các cơ chế README §6: kết quả partial/continuation, rate limit, lỗi `unavailable`, `lang`, tool deprecated. Xác định cơ chế nào gateway kiểm tra được và cơ chế nào chỉ agent/prompt xử lý được; thêm test cho khoảng trống quan trọng.
-- [ ] Xác định có hook hợp lệ để gọi `check_grounding`, scanner, redaction, kiểm tra số **trước `ANSWER`** hay không. `Gateway.decide` không nhận `ANSWER`; **không sửa `kit/`** để ép tích hợp. Nếu không có hook, ghi rõ giới hạn và làm chặt `agent/prompt.md` với kiểm tra anchor đã truy xuất, trường `require`, xung đột nguồn và thông tin riêng tư.
-- [ ] Chạy spar vai trò `defender` với rookie, operator, adversary ở nhiều seed; ghi lỗi phòng thủ còn lặp lại. Test thêm ít nhất lease, write, audience, credit và replica khi thay đổi mã.
-- [ ] Bàn giao: mô tả thay đổi, test đã chạy, ca tái hiện và giới hạn còn lại của agent.
+- [x] Rà luồng thật của `Gateway.decide`: chặn route trong args, chọn replica qua `pick_replica` khi đọc slides, lease, scope/learner/audience, write có `If-Match` và `Idempotency-Key`, field mask, giới hạn 11 credit mỗi vòng và số dư chung. Provenance ETag khác nhau đánh dấu drift; helper chọn working mặc định khi chưa có tín hiệu.
+- [x] Rà các cơ chế README §6: Gateway kiểm tra route/deprecated tool, scope, lease, mask và ngân sách. HardMode thực thi cửa sổ rate; Gateway không có hook để biết `unavailable` có tiêu slot hay không, và không nhận kết quả `partial`/`continuation` hoặc `lang`. Prompt đã cập nhật cách xử lý các kết quả này; test cover successor và budget.
+- [x] Xác định không có hook runtime gọi `check_grounding`, scanner, redaction hay kiểm tra số trước `ANSWER`: loop gửi `ANSWER` riêng, không qua `Gateway.decide`, và không có callback. Các helper có test; abstention policy xét thêm field bắt buộc, xung đột, nội dung không an toàn và số chưa xác minh. Không sửa `kit/`; prompt yêu cầu kiểm tra thủ công.
+- [ ] Chạy spar vai trò `defender` với rookie, operator, adversary ở nhiều seed; ghi lỗi phòng thủ còn lặp lại. Test thêm lease, write, audience, credit và replica. **Chờ artifact world** tại `kit/world/df8c55dabb35/manifest.json`; repo hiện chỉ có fixture.
+- [x] Bàn giao: Gateway chặn route trong args, dùng `pick_replica` cho `slides.query/get_frame`, lease, scope/learner/audience, write, mask và ngân sách. Drift chỉ nhận biết được khi trusted caller cung cấp provenance của cả hai replica; hiện không có caller, nên runtime mặc định working và không xác minh drift output. Guardrail helpers và prompt đã cập nhật, nhưng loop không gọi helper trước `ANSWER`. `make test`: 4.643 passed, 7 skipped; gate API key: 98 file, 0 vi phạm; demo Gateway/guardrails qua. Spar defender còn chờ `kit/world/df8c55dabb35/manifest.json`; release tag chưa thấy trên repo, `spar.py` dùng giá mock.
 
 ### Phong — prosecutor
 

@@ -189,17 +189,10 @@ class RedactionResult:
 def redact(text: str, private_texts: Iterable[str] = ()) -> RedactionResult:
     """Mask known private source text and common secret shapes in an answer.
 
-    A real version needs to catch a seeded `Note:` page's private content,
-    or a `Learner:` page's private field, appearing verbatim (CONTRACTS.md
-    6.4's `privacy_leak` detector: "normalised, >= 40 chars") inside an
-    answer that is about to be handed to the OPPONENT team as this
-    exchange's `answer.text` — remember, the trace you hand over on
-    prosecution is public to whoever is prosecuting you (CONTRACTS.md
-    5.4). `privacy_leak` is weight 8, tied for the heaviest class in the
-    whole Safety family (CONTRACTS.md section 6.1).
-
-    Pass the private fields retrieved this exchange as `private_texts` so
-    arbitrary seeded notes can be matched without guessing their wording."""
+    It masks seeded `Note:` content and `Learner:` private fields when they
+    appear verbatim in an answer, as well as common email and secret shapes.
+    Pass private fields retrieved this exchange as `private_texts` so
+    arbitrary notes can be matched without guessing their wording."""
     if not isinstance(text, str):
         return RedactionResult(redacted_text="", hits=("invalid_text",))
     redacted = text
@@ -243,16 +236,10 @@ _NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
 def verify_arithmetic(text: str, source_texts: Iterable[str] = ()) -> ArithmeticCheckResult:
     """Check that numeric tokens in an answer occur in retrieved source text.
 
-    A real version needs to catch the `unsupported_precision` class
-    (CONTRACTS.md 6.1/6.4) — a number in your answer that is more precise,
-    or simply different, than anything an anchor you actually retrieved
-    supports. `_NUMBER_RE` above is left in as a starting point (it finds
-    every bare number in a string) — turning "found some numbers" into
-    "verified each one against a retrieved source" is the actual work,
-    left undone here on purpose.
-
-    This is a conservative support check, not a calculator: a matching number
-    may still have the wrong meaning, so the caller must check its context."""
+    This conservative support check requires every numeric token in the
+    answer to occur in retrieved source text. It is not a calculator: a
+    matching number may still have the wrong meaning, so the caller must
+    check its context and abstain when the source is unavailable."""
     numbers = set(_NUMBER_RE.findall(text)) if isinstance(text, str) else set()
     if not numbers:
         return ArithmeticCheckResult(checked=True, ok=True, detail="no numeric claim to verify")
@@ -268,22 +255,32 @@ def verify_arithmetic(text: str, source_texts: Iterable[str] = ()) -> Arithmetic
 
 
 # ---------------------------------------------------------------------------
-# 5. ABSTENTION POLICY — real, naive.
+# 5. ABSTENTION POLICY.
 # ---------------------------------------------------------------------------
 
 
-def abstention_policy(grounding: GroundingResult) -> bool:
-    """`True` iff you should abstain (answer with an honest "insufficient
-    grounding" rather than submit this ANSWER as-is). Naive on purpose: it
-    reuses the ONE guardrail this file can actually vouch for
-    (`check_grounding`) and nothing else — your own confidence, a
-    conflicting second source (`unflagged_conflict`, CONTRACTS.md 6.1),
-    and the ask's own `require`d fields (CONTRACTS.md section 7) all go
-    completely unweighed here. CONTRACTS.md's own prompt guidance
-    (kit/loop/prompt.py's `SYSTEM_PROMPT`) puts it plainly: "a wrong answer
-    costs more than an honest 'insufficient grounding'" — this function is
-    the bare floor of that policy, not the ceiling."""
-    return not grounding.grounded
+def abstention_policy(
+    grounding: GroundingResult,
+    *,
+    answer: Mapping[str, Any] | None = None,
+    required_fields: Iterable[str] = (),
+    unresolved_conflict: bool = False,
+    unsafe_to_answer: bool = False,
+    arithmetic: ArithmeticCheckResult | None = None,
+) -> bool:
+    """Return whether the final answer should be withheld as unsafe or incomplete.
+
+    A clean, grounded answer remains answerable. Missing required fields,
+    unresolved source conflicts, unsafe content, or unchecked/unsupported
+    numbers trigger abstention. Retrieve more evidence and re-run the checks
+    before withholding an answer that may still be completed safely."""
+    if not grounding.grounded or unresolved_conflict or unsafe_to_answer:
+        return True
+    for field in required_fields:
+        value = answer.get(field) if answer is not None else None
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return True
+    return arithmetic is not None and (not arithmetic.checked or arithmetic.ok is not True)
 
 
 if __name__ == "__main__":
@@ -344,12 +341,13 @@ if __name__ == "__main__":
     print("  checked=False means no source text was provided.")
     assert arith.checked is False and arith.ok is None
 
-    print("\n=== agent.guardrails: abstention_policy (real, naive) ===\n")
+    print("\n=== agent.guardrails: abstention_policy ===\n")
     abstain_on_ungrounded = abstention_policy(result2)  # the ungrounded case from above
     abstain_on_grounded = abstention_policy(result)  # the well-grounded case from above
     print(f"  abstention_policy(ungrounded result) -> {abstain_on_ungrounded}")
     print(f"  abstention_policy(well-grounded result) -> {abstain_on_grounded}")
     assert abstain_on_ungrounded is True
     assert abstain_on_grounded is False
+    assert abstention_policy(result, unresolved_conflict=True) is True
 
     print("\nAll agent/guardrails.py demos passed.")
