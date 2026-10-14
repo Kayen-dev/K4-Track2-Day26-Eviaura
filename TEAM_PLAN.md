@@ -1,20 +1,23 @@
 # Trạng thái bàn giao — Eviaura · Day 26
 
-Kiệt đã làm phần triển khai chính. Phần bổ sung lần này tập trung vào
-kiểm chứng và hồ sơ, không thay mã agent/prosecutor hoặc nội dung deck.
+Trạng thái hiện tại dựa trên [GitHub Actions run 38605983705](https://github.com/Kayen-dev/K4-Track2-Day26-Eviaura/actions/runs/38605983705)
+và bundle được xác minh từ run đó. Phần bên dưới tiêu đề “Kế hoạch ban đầu”
+là bản lưu lịch sử; các ô chưa đánh dấu ở đó không phản ánh tiến độ hiện tại.
 
 - [x] Ba artifact `agent/`, `deck/`, `eval/` có mặt.
 - [x] Thêm 14 ca tích hợp cho 8 cơ chế và replica; lưu trace trong JUnit.
-- [x] Chạy đầy đủ trên Ubuntu/Python 3.12: 4.655 pass, 7 skip, 0 lỗi.
+- [x] Chạy đầy đủ trên Ubuntu/Python 3.12: 4.680 pass, 7 skip, 0 lỗi.
 - [x] Gate PASS; deck 0 lỗi/1 cảnh báo; prosecutor 34/34 claim đúng.
 - [x] Kiểm tra 36 cấu hình spar theo bot, role và seed.
-- [x] Workflow Linux qua actionlint; pipeline tương ứng đã chạy cục bộ.
+- [x] Workflow Linux qua actionlint và GitHub Actions; run mới nhất pass.
 - [x] Đồng bộ tên đội và điền username của cả ba thành viên.
 - [x] Tạo bundle, xác minh file/hash và đóng gói hồ sơ.
-- [ ] Push workflow để có kết quả GitHub Actions.
-- [ ] Nhóm chốt bài và nộp lên hệ thống giảng viên.
+- [x] Push workflow và xác nhận GitHub Actions pass trên world release chính thức.
+- [ ] Nhóm chốt bài và nộp `submissions/Eviaura.bundle` lên hệ thống giảng viên;
+  repo không ghi link hệ thống hoặc trạng thái nộp.
 - [ ] Kiểm chứng harness thật: hook trước ANSWER, freshness và các lỗi
-  đã tái hiện. Chi tiết trong [report](docs/DAY26_REVIEW.md).
+  đã tái hiện. Cần phiên Arena của giảng viên; CI và `spar.py` không có hook
+  hoặc mutation engine đó. Chi tiết trong [report](docs/DAY26_REVIEW.md).
 
 Các test skip và kết quả spar không chứng minh cách ly kernel hay chất
 lượng tournament. Không sửa kit/bot/fixture để làm xanh kiểm tra.

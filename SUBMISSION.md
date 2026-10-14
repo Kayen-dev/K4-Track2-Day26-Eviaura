@@ -8,4 +8,4 @@
 
 Kiểm tra cục bộ trên Linux/Python 3.12: 4.680 test pass, 7 skip; validator deck 0 lỗi, 1 cảnh báo; 34/34 cáo buộc đúng trên 40 fixture; 36 lượt spar. **Dải sát thương chưa được chứng minh:** trong cấu hình `all`, Adversary seed 5 còn 0 HP, nhưng phép thử đối chứng với lineup toàn blank cũng hạ bot ở seed đó. Audit ghi cảnh báo, không dùng HP của spar làm kết luận về riêng deck. Chi tiết ở [report](docs/DAY26_REVIEW.md).
 
-Workflow Linux cần secret `WORLD_RELEASE_TOKEN` có quyền đọc release riêng của giảng viên. Chưa có kết quả GitHub Actions hoặc xác nhận nộp trên hệ thống giảng viên. `TEAM_PLAN.md` được giữ nguyên theo yêu cầu.
+[GitHub Actions run 38605983705](https://github.com/Kayen-dev/K4-Track2-Day26-Eviaura/actions/runs/38605983705) đã pass trên world release chính thức; workflow dùng token mặc định để tải release public và kiểm tra SHA-256. Chưa có xác nhận nộp trên hệ thống giảng viên hoặc kết quả từ harness Arena thật.
