@@ -27,13 +27,9 @@ jobs:
       - name: Download and verify official student world
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.WORLD_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [[ -z "$GH_TOKEN" ]]; then
-            echo '::error::Set WORLD_RELEASE_TOKEN with read access to the instructor release repository.'
-            exit 1
-          fi
           archive="$RUNNER_TEMP/colosseum-world-df8c55dabb35.zip"
           gh release download world-df8c55dabb35 \
             --repo VinUni-AI20k/Day26-Colosseum-Agent-Arena-Kit \
