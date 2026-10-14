@@ -1,16 +1,13 @@
-# Thành viên nhóm — Day 26 Colosseum
+# Nhóm Eviaura — Day 26
 
-**Tên đội dùng khi đóng gói:** `kayendev-lutech`
+| Thành viên | GitHub username | Phạm vi công việc |
+| --- | --- | --- |
+| Dũng | `bananayass` | Theo phân công: rà phòng thủ agent; chưa có kết quả riêng được xác nhận trong lần kiểm tra này. |
+| Kiệt | `kayendev` | Triển khai agent, deck, prosecutor đã có tại commit `fb8680b`; giữ nguyên phần xử lý. |
+| Phong | `phong123-ai` | Phần bổ sung theo yêu cầu: test tích hợp, kiểm chứng Linux, CI và hồ sơ bàn giao. |
 
-| STT | Họ và tên | GitHub username | Phần phụ trách (dự kiến) | Xác nhận |
-| --- | --- | --- | --- | --- |
-| 1 | Dũng | [Điền username] | Agent: gateway, guardrails, chiến lược phòng thủ | [ ] |
-| 2 | Kiệt | [Điền username] | Rà deck và kiểm chứng spar (phần nhẹ; đã làm trước đó) | [ ] |
-| 3 | Phong | [Điền username] | Prosecutor: detector, bằng chứng, kiểm thử | [ ] |
+Username do nhóm cung cấp. Lịch sử Git ghi phần triển khai ban đầu dưới
+tên `kayendev-lutech`; không gán các commit của tác giả kit cho nhóm.
 
-Điền GitHub username và thống nhất phân công trước khi nộp. Cột phụ trách
-chỉ là đề xuất, không khẳng định đóng góp thực tế của từng người. Chi tiết
-đầu việc và tiêu chí hoàn thành nằm trong `TEAM_PLAN.md`.
-
-`TEAMMATES.md` dùng để theo dõi nhóm trong repo. Bundle do `kit.submit` tạo
-chỉ chứa `agent/`, `deck/` và `eval/`, nên file này không nằm trong bundle.
+Thông tin này mô tả phạm vi công việc, không thay chữ ký/xác nhận của
+thành viên. Tên đội trong deck và bundle là `Eviaura`.
