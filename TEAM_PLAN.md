@@ -1,10 +1,25 @@
-# Kế hoạch nhóm — Day 26 Colosseum
+# Trạng thái bàn giao — Eviaura · Day 26
 
-**Thành viên:** Dũng, Kiệt, Phong
+Kiệt đã làm phần triển khai chính. Phần bổ sung lần này tập trung vào
+kiểm chứng và hồ sơ, không thay mã agent/prosecutor hoặc nội dung deck.
 
-**Tên đội dự kiến:** `Eviaura`
+- [x] Ba artifact `agent/`, `deck/`, `eval/` có mặt.
+- [x] Thêm 14 ca tích hợp cho 8 cơ chế và replica; lưu trace trong JUnit.
+- [x] Chạy đầy đủ trên Ubuntu/Python 3.12: 4.655 pass, 7 skip, 0 lỗi.
+- [x] Gate PASS; deck 0 lỗi/1 cảnh báo; prosecutor 34/34 claim đúng.
+- [x] Kiểm tra 36 cấu hình spar theo bot, role và seed.
+- [x] Workflow Linux qua actionlint; pipeline tương ứng đã chạy cục bộ.
+- [x] Đồng bộ tên đội và điền username của cả ba thành viên.
+- [x] Tạo bundle, xác minh file/hash và đóng gói hồ sơ.
+- [ ] Push workflow để có kết quả GitHub Actions.
+- [ ] Nhóm chốt bài và nộp lên hệ thống giảng viên.
+- [ ] Kiểm chứng harness thật: hook trước ANSWER, freshness và các lỗi
+  đã tái hiện. Chi tiết trong [report](docs/DAY26_REVIEW.md).
 
-**Phân công:** Dũng và Phong xử lý phần kỹ thuật còn mở. Kiệt chỉ rà và xác nhận deck vì đã làm trước đó; không giao lại việc đã xong.
+Các test skip và kết quả spar không chứng minh cách ly kernel hay chất
+lượng tournament. Không sửa kit/bot/fixture để làm xanh kiểm tra.
+
+## Kế hoạch ban đầu (lưu để đối chiếu)
 
 ## 1. Kết luận rà soát và điểm xuất phát
 
@@ -80,3 +95,8 @@ $env:PYTHONIOENCODING = 'utf-8'
 Các lệnh spar ở trên chỉ là ví dụ; bảng kết quả cuối phải có nhiều seed và các role cần thiết. Trên Linux/CI, chạy `python -m pytest tests/` đầy đủ để kiểm tra lại 3 ca đang bị loại trên Windows.
 
 `TEAMMATES.md` và file kế hoạch này để nhóm phối hợp trong repo; công cụ nộp chỉ đóng gói `agent/`, `deck/`, `eval/`.
+
+## Hồ sơ bàn giao
+
+Bài chính: `submissions/Eviaura.bundle`. Hồ sơ đi kèm:
+`submissions/Eviaura-hoso.zip`; xem [SUBMISSION.md](SUBMISSION.md).

@@ -1,0 +1,52 @@
+name: Day26 Linux checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONHASHSEED: "0"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install pytest==8.3.4
+      - name: Download and verify official student world
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/colosseum-world-df8c55dabb35.zip"
+          curl --fail --location --retry 3 \
+            https://github.com/VinUni-AI20k/Day26-Colosseum-Agent-Arena-Kit/releases/download/world-df8c55dabb35/colosseum-world-df8c55dabb35.zip \
+            --output "$archive"
+          printf '%s  %s\n' e05327c0bd88b2b1ee9c9194a4bee5535964360d97d462144773d02686705810 "$archive" | sha256sum --check
+          unzip -q "$archive" -d .
+          test -f kit/world/df8c55dabb35/manifest.json
+          test ! -f kit/world/df8c55dabb35/truth.json
+      - name: Full suite, mechanics traces, deck, spar and bundle verification
+        run: python tools/audit_day26.py --team Eviaura
+      - name: Keep evidence even when a check fails
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: day26-linux-evidence
+          path: |
+            runs/day26-audit/*.log
+            runs/day26-audit/*.json
+            runs/day26-audit/*.xml
+            submissions/Eviaura.bundle
+          retention-days: 14
+          if-no-files-found: warn
