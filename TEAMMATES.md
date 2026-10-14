@@ -1,10 +1,10 @@
 # Thành viên nhóm — Day 26 Colosseum
 
-**Tên đội dùng khi đóng gói:** `Eviaura`
+**Tên đội dùng khi đóng gói:** `kayendev-lutech`
 
 | STT | Họ và tên | GitHub username | Phần phụ trách (dự kiến) | Xác nhận |
 | --- | --- | --- | --- | --- |
-| 1 | Trần Nguyễn Trí Dũng (MSSV: 2A202602784) | bananayass | Agent: gateway, guardrails, chiến lược phòng thủ | [ ] |
+| 1 | Trần Nguyễn Trí Dũng (MSSV: 2A202602784) | bananayass | Agent: gateway, guardrails, chiến lược phòng thủ | [ gateway ] |
 | 2 | Kiệt | [Điền username] | Rà deck và kiểm chứng spar (phần nhẹ; đã làm trước đó) | [ ] |
 | 3 | Phong | [Điền username] | Prosecutor: detector, bằng chứng, kiểm thử | [ ] |
 
