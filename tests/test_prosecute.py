@@ -557,6 +557,16 @@ def test_prosecutor_end_to_end_against_the_full_fixture_set(labelled_fixtures):
         assert report["per_class"][cls]["present"] >= 2
 
 
+@pytest.mark.parametrize("cls", sorted(CLASSES))
+def test_trace_backed_detectors_cite_the_actual_violation(labelled_fixtures, cls):
+    for variant in ("positive", "near_miss"):
+        fx = _by_id(labelled_fixtures, f"{cls}__{variant}")
+        claims = prosecute(fx["trace"], fx["answer"], fx["card"])["claims"]
+        matching = [claim for claim in claims if claim["cls"] == cls]
+        assert len(matching) == 1
+        assert set(fx["label"]["present_classes"][cls]["proof_refs"]).issubset(matching[0]["evidence"])
+
+
 def test_starter_files_nothing_on_clean_fixtures(labelled_fixtures):
     clean = [fx for fx in labelled_fixtures if not fx["label"]["present_classes"]]
     for fx in clean:
