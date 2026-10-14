@@ -26,12 +26,19 @@ jobs:
         run: python -m pip install pytest==8.3.4
       - name: Download and verify official student world
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WORLD_RELEASE_TOKEN }}
         run: |
           set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo '::error::Set WORLD_RELEASE_TOKEN with read access to the instructor release repository.'
+            exit 1
+          fi
           archive="$RUNNER_TEMP/colosseum-world-df8c55dabb35.zip"
-          curl --fail --location --retry 3 \
-            https://github.com/VinUni-AI20k/Day26-Colosseum-Agent-Arena-Kit/releases/download/world-df8c55dabb35/colosseum-world-df8c55dabb35.zip \
-            --output "$archive"
+          gh release download world-df8c55dabb35 \
+            --repo VinUni-AI20k/Day26-Colosseum-Agent-Arena-Kit \
+            --pattern 'colosseum-world-df8c55dabb35.zip' \
+            --dir "$RUNNER_TEMP"
           printf '%s  %s\n' e05327c0bd88b2b1ee9c9194a4bee5535964360d97d462144773d02686705810 "$archive" | sha256sum --check
           unzip -q "$archive" -d .
           test -f kit/world/df8c55dabb35/manifest.json

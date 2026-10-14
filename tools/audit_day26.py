@@ -13,6 +13,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -89,16 +90,21 @@ def capture(bot, role, seed):
     save(OUT / f"{name}.json", exchanges)
     # Parse the actual CLI result rather than reimplementing HP arithmetic.
     result_line = next(line.strip() for line in stream.getvalue().splitlines() if "RESULT:" in line)
+    match = re.fullmatch(r"RESULT: (YOU|BOT|DRAW)\s+you (\d+) — (\d+) " + re.escape(bot), result_line)
+    if match is None:
+        raise RuntimeError(f"Unexpected spar result: {result_line}")
     verdicts = Counter(row["outcome"] for x in exchanges for row in x["gate1"])
     ms = [x["student_prosecutor_ms"] for x in exchanges if x["student_prosecutor_ms"] is not None]
     summary = {"bot": bot, "role": role, "seed": seed, "exit_code": code,
-               "result": result_line, "rounds": len(exchanges) // 2,
+               "result": result_line, "hp_you": int(match[2]), "hp_bot": int(match[3]),
+               "rounds": len(exchanges) // 2,
                "gate1": dict(verdicts), "prosecutor_max_ms": max(ms, default=0),
                "missed": dict(Counter(m["reason"] for x in exchanges for m in x["missed_analysis"])),
-               "credits_min": min(x["credits_left"] for x in exchanges if x["defender"] == "you"),
-               "gateway_max_ms": max(e["p"].get("latency_ms", 0) for x in exchanges
-                                     if x["defender"] == "you" for e in x["trace"] if e["type"] == "decision"),
                "trace": f"runs/day26-audit/{name}.json"}
+    if role in ("defender", "all"):
+        summary["credits_min"] = min(x["credits_left"] for x in exchanges if x["defender"] == "you")
+        summary["gateway_max_ms"] = max(e["p"].get("latency_ms", 0) for x in exchanges
+                                        if x["defender"] == "you" for e in x["trace"] if e["type"] == "decision")
     save(OUT / f"{name}-summary.json", summary)
     return code
 
@@ -126,6 +132,15 @@ def verify_bundle(team):
         return {"team": manifest["team"], "files": len(manifest["files"]),
                 "kit_hashes": len(manifest["kit_hashes"]), "errors": errors,
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def lethality_warnings(spar):
+    """Flag local HP outside the target band; generic bot errors also affect HP."""
+    return [f"{row['bot']}-all-seed{row['seed']}: {row['result']}"
+            for row in spar if row.get("role") == "all" and row.get("bot") in ("rookie", "adversary")
+            and (row.get("hp_bot") is None or
+                 (row["bot"] == "rookie" and row["hp_bot"] != 0) or
+                 (row["bot"] == "adversary" and row["hp_bot"] == 0))]
 
 
 def main():
@@ -175,6 +190,7 @@ def main():
                 report["spar"].append(json.loads(summary.read_text(encoding="utf-8"))
                                       if check["exit_code"] == 0 else check)
                 print(name, check["exit_code"], flush=True)
+    report["lethality_warnings"] = lethality_warnings(report["spar"])
     report["checks"]["submit"] = run("submit", ["-m", "kit.submit", "--team", args.team])
     if report["checks"]["submit"]["exit_code"] == 0:
         report["bundle"] = verify_bundle(args.team)
@@ -183,7 +199,8 @@ def main():
     save(OUT / "results.json", report)
     # A Windows accommodation never turns the full-suite failure into a pass.
     failed = [name for name, check in report["checks"].items() if check["exit_code"]]
-    print("results:", OUT / "results.json", "failed:", failed)
+    print("results:", OUT / "results.json", "failed:", failed,
+          "lethality_warnings:", report["lethality_warnings"])
     return int(bool(failed or report["tracked_files_changed"] or report.get("bundle", {}).get("errors")
                     or any(row["exit_code"] for row in report["spar"])))
 

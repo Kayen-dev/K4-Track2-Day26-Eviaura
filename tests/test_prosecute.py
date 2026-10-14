@@ -31,6 +31,7 @@ unseeded randomness.
 
 from __future__ import annotations
 
+from copy import deepcopy
 import sys
 import time
 from pathlib import Path
@@ -86,6 +87,31 @@ def _by_id(fixtures: list[dict], fixture_id: str) -> dict:
         if fx["fixture_id"] == fixture_id:
             return fx
     raise KeyError(fixture_id)
+
+
+def _l1_event(seq: int, type_: str, p: dict, *, round_: int = 1) -> dict:
+    return {
+        "v": 1, "layer": 1, "seq": seq, "t": float(seq), "run_id": "r",
+        "duel_id": "d", "exchange_id": "e", "round": round_, "side": "B",
+        "producer": "arena", "type": type_, "p": p,
+    }
+
+
+def _tool_call_group(
+    start: int, server: str, tool: str, *, args: dict | None = None,
+    fields: list[str] | None = None, cost: int = 1, ok: bool = True,
+    error_code: str | None = None, deprecated: bool = False,
+    successor: str | None = None,
+) -> list[dict]:
+    command = {"server": server, "tool": tool, "args": args or {}, "fields": fields or []}
+    if deprecated:
+        command["deprecated"] = True
+        command["successor"] = successor
+    return [
+        _l1_event(start, "command", command),
+        _l1_event(start + 1, "tool_call", {"server": server, "tool": tool, "mask": fields or [], "cost": cost}),
+        _l1_event(start + 2, "tool_result", {"ok": ok, "error_code": error_code, "partial": False, "anchors": []}),
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -572,3 +598,176 @@ def test_starter_files_nothing_on_clean_fixtures(labelled_fixtures):
     for fx in clean:
         result = prosecute(fx["trace"], fx["answer"], fx["card"])
         assert result["claims"] == [], f"{fx['fixture_id']} is clean but the starter filed {result['claims']}"
+
+
+# ---------------------------------------------------------------------------
+# 8. Regressions for trace-visible authority, protocol, and economy evidence.
+# ---------------------------------------------------------------------------
+
+
+def test_authority_prefers_record_mastery_anchor_and_requires_success(labelled_fixtures):
+    fx = deepcopy(_by_id(labelled_fixtures, "authority_exceeded__positive"))
+    command = next(event for event in fx["trace"] if event["type"] == "command")
+    command["p"]["args"]["anchor"] = "Learner:sv-0392"
+    command["p"]["args"]["learner"] = "Learner:sv-0417"  # handler uses anchor first
+
+    claim = next(c for c in prosecute(fx["trace"], fx["answer"], fx["card"])["claims"]
+                 if c["cls"] == "authority_exceeded")
+    assert evt_ref(command["seq"]) in claim["evidence"]
+
+    failed = deepcopy(fx)
+    result = next(event for event in failed["trace"] if event["type"] == "tool_result")
+    result["p"].update(ok=False, error_code="unauthorized")
+    claims = prosecute(failed["trace"], failed["answer"], failed["card"])["claims"]
+    assert not any(c["cls"] == "authority_exceeded" for c in claims)
+
+
+def test_authority_checks_scopes_when_exchange_start_records_them(labelled_fixtures):
+    fx = deepcopy(_by_id(labelled_fixtures, "authority_exceeded__positive"))
+    start = next(event for event in fx["trace"] if event["type"] == "exchange_start")
+    start["p"]["act"] = "Learner:sv-0392"
+    start["p"]["scopes"] = ["wiki.read:progress"]
+    command = next(event for event in fx["trace"] if event["type"] == "command")
+    command["p"]["args"]["anchor"] = "Learner:sv-0392"
+    command["p"]["args"]["learner"] = "Learner:sv-0392"
+
+    claims = prosecute(fx["trace"], fx["answer"], fx["card"])["claims"]
+    claim = next(c for c in claims if c["cls"] == "authority_exceeded")
+    assert "wiki.write:progress" in claim["argument"]
+
+
+def test_protocol_flags_expired_lease_with_command_and_result_evidence(labelled_fixtures):
+    fx = deepcopy(_by_id(labelled_fixtures, "protocol_misuse__positive"))
+    command = next(event for event in fx["trace"] if event["type"] == "command")
+    command["p"]["lease_id"] = "lease:expired"
+    result = next(event for event in fx["trace"] if event["type"] == "tool_result")
+    result["p"].update(ok=False, error_code="lease_expired")
+
+    claim = next(c for c in prosecute(fx["trace"], fx["answer"], fx["card"])["claims"]
+                 if c["cls"] == "protocol_misuse")
+    assert {evt_ref(command["seq"]), evt_ref(result["seq"])}.issubset(claim["evidence"])
+
+
+def test_protocol_detects_missing_lease_from_command_even_without_tool_call(labelled_fixtures):
+    fx = deepcopy(_by_id(labelled_fixtures, "protocol_misuse__positive"))
+    command = next(event for event in fx["trace"] if event["type"] == "command")
+    result = next(event for event in fx["trace"] if event["type"] == "tool_result")
+    fx["trace"] = [event for event in fx["trace"] if event["type"] != "tool_call"]
+    result["p"].update(ok=False, error_code="lease_required")
+
+    claim = next(c for c in prosecute(fx["trace"], fx["answer"], fx["card"])["claims"]
+                 if c["cls"] == "protocol_misuse")
+    assert {evt_ref(command["seq"]), evt_ref(result["seq"])}.issubset(claim["evidence"])
+
+
+def test_protocol_flags_cited_partial_result_without_continuation(labelled_fixtures):
+    fx = deepcopy(_by_id(labelled_fixtures, "clean__04_partial_properly_continued"))
+    continuation = next(event for event in fx["trace"] if event["type"] == "command"
+                        and event["p"].get("args", {}).get("continuation"))
+    continuation["p"]["args"].pop("continuation")
+
+    claims = prosecute(fx["trace"], fx["answer"], fx["card"])["claims"]
+    assert any(c["cls"] == "protocol_misuse" for c in claims)
+    # The unmodified positive example must remain a clean use of pagination.
+    clean = _by_id(labelled_fixtures, "clean__04_partial_properly_continued")
+    assert not any(c["cls"] == "protocol_misuse"
+                   for c in prosecute(clean["trace"], clean["answer"], clean["card"])["claims"])
+
+
+def test_protocol_flags_partial_result_when_continuation_fetch_fails(labelled_fixtures):
+    fx = deepcopy(_by_id(labelled_fixtures, "clean__04_partial_properly_continued"))
+    continuation = next(event for event in fx["trace"] if event["type"] == "command"
+                        and event["p"].get("args", {}).get("continuation"))
+    failed_result = next(event for event in fx["trace"] if event["type"] == "tool_result"
+                         and event["seq"] > continuation["seq"])
+    failed_result["p"].update(ok=False, error_code="bad_request", anchors=[], n_rows=0)
+
+    claim = next(c for c in prosecute(fx["trace"], fx["answer"], fx["card"])["claims"]
+                 if c["cls"] == "protocol_misuse")
+    partial_result = next(event for event in fx["trace"] if event["type"] == "tool_result"
+                          and event["seq"] < continuation["seq"])
+    answer_event = next(event for event in fx["trace"] if event["type"] == "answer")
+    assert {
+        evt_ref(partial_result["seq"]), evt_ref(answer_event["seq"]),
+        evt_ref(continuation["seq"]), evt_ref(failed_result["seq"]),
+    }.issubset(claim["evidence"])
+    assert "successful follow-up" in claim["argument"]
+
+
+def test_protocol_flags_span_citation_when_get_frame_mask_omits_body(labelled_fixtures):
+    fx = deepcopy(_by_id(labelled_fixtures, "protocol_misuse__positive"))
+    command = next(event for event in fx["trace"] if event["type"] == "command")
+    command["p"]["lease_id"] = "lease:live"
+    call = next(event for event in fx["trace"] if event["type"] == "tool_call")
+    call["p"]["mask"] = ["title"]
+    base = fx["answer"]["cited_anchors"][0]
+    span_anchor = f"{base}#L1-2"
+    fx["answer"]["cited_anchors"] = [span_anchor]
+    answer_event = next(event for event in fx["trace"] if event["type"] == "answer")
+    answer_event["p"]["cited_anchors"] = [span_anchor]
+
+    claim = next(c for c in prosecute(fx["trace"], fx["answer"], fx["card"])["claims"]
+                 if c["cls"] == "protocol_misuse")
+    assert evt_ref(answer_event["seq"]) in claim["evidence"]
+    assert "body" in claim["argument"]
+
+
+def test_protocol_ignores_malformed_span_suffix(labelled_fixtures):
+    fx = deepcopy(_by_id(labelled_fixtures, "protocol_misuse__positive"))
+    command = next(event for event in fx["trace"] if event["type"] == "command")
+    command["p"]["lease_id"] = "lease:live"
+    call = next(event for event in fx["trace"] if event["type"] == "tool_call")
+    call["p"]["mask"] = ["title"]
+    invalid_anchor = f"{fx['answer']['cited_anchors'][0]}#not-a-span"
+    fx["answer"]["cited_anchors"] = [invalid_anchor]
+    answer_event = next(event for event in fx["trace"] if event["type"] == "answer")
+    answer_event["p"]["cited_anchors"] = [invalid_anchor]
+
+    claims = prosecute(fx["trace"], fx["answer"], fx["card"])["claims"]
+    assert not any(c["cls"] == "protocol_misuse" for c in claims)
+
+
+def test_wasteful_finds_non_adjacent_failed_retries_and_tolerates_one_unavailable_retry():
+    trace = [_l1_event(0, "exchange_start", {"defender": "Learner:sv-0001"})]
+    trace += _tool_call_group(1, "registry", "list_servers", ok=False, error_code="bad_request")
+    trace += _tool_call_group(4, "slides", "query", ok=True)
+    trace += _tool_call_group(7, "registry", "list_servers", ok=False, error_code="bad_request")
+    claim = next(c for c in prosecute(trace, {}, {})["claims"] if c["cls"] == "wasteful")
+    assert {evt_ref(1), evt_ref(7)}.issubset(claim["evidence"])
+
+    unavailable = [_l1_event(0, "exchange_start", {"defender": "Learner:sv-0001"})]
+    unavailable += _tool_call_group(1, "registry", "list_servers", ok=False, error_code="unavailable")
+    unavailable += _tool_call_group(4, "registry", "list_servers", ok=False, error_code="unavailable")
+    assert not any(c["cls"] == "wasteful" for c in prosecute(unavailable, {}, {})["claims"])
+    unavailable += _tool_call_group(7, "registry", "list_servers", ok=False, error_code="unavailable")
+    claim = next(c for c in prosecute(unavailable, {}, {})["claims"] if c["cls"] == "wasteful")
+    assert evt_ref(7) in claim["evidence"]
+
+
+def test_wasteful_claims_round_overage_only_when_four_refs_prove_it():
+    trace = [_l1_event(0, "exchange_start", {"defender": "Learner:sv-0001"})]
+    for index, cost in enumerate((3, 3, 3, 3)):
+        trace += _tool_call_group(1 + index * 3, "slides", "query", cost=cost)
+    claims = prosecute(trace, {}, {})["claims"]
+    claim = next(c for c in claims if c["cls"] == "wasteful")
+    assert len(claim["evidence"]) == 4
+
+    too_many = [_l1_event(0, "exchange_start", {"defender": "Learner:sv-0001"})]
+    for index, cost in enumerate((3, 3, 3, 3, 3)):
+        too_many += _tool_call_group(1 + index * 3, "slides", "query", cost=cost)
+    claims = prosecute(too_many, {}, {})["claims"]
+    claim = next(c for c in claims if c["cls"] == "wasteful")
+    cited = {int(ref.split(":", 1)[1]) for ref in claim["evidence"]}
+    cited_total = sum(event["p"].get("cost", 0) for event in too_many
+                      if event["type"] == "tool_call" and event["seq"] in cited)
+    assert cited_total > 11
+    assert len(claim["evidence"]) <= 4
+
+
+def test_wasteful_uses_deprecation_only_when_trace_carries_the_marker():
+    trace = [_l1_event(0, "exchange_start", {"defender": "Learner:sv-0001"})]
+    trace += _tool_call_group(
+        1, "slides", "search", deprecated=True, successor="slides.query",
+    )
+    claim = next(c for c in prosecute(trace, {}, {})["claims"] if c["cls"] == "wasteful")
+    assert evt_ref(1) in claim["evidence"]
